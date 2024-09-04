@@ -1,9 +1,7 @@
-/*  Some example code and prototype - 
-    contains many, many problems: should check for return values 
-    (especially system calls), handle errors, not use fixed paths,
-    handle parameters, put comments, watch out for buffer overflows,
-    security problems, use environment variables, etc.
- */
+//Kevin Farokhrouz
+//Ali Jifi-Bahlool
+//CSE 3320-001
+//Lab 1
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -12,6 +10,7 @@
 #include <dirent.h>
 #include <string.h>
 #include <time.h>
+#include <ctype.h>
 
 int main(void) {
     pid_t child;
@@ -23,9 +22,11 @@ int main(void) {
     struct tm *tm_info;
     char buffer[160];
 
+
+    //clear terminal
+    system("clear"); 
     while (1) {
-      //clear terminal
-      system("clear"); 
+      
 
       //print cwd
       if (getcwd(s, sizeof(s)) == NULL) {
@@ -56,38 +57,74 @@ int main(void) {
       }
 
       // Print the formatted time
-      printf("It is currently %s\n", buffer);
-      printf("-----------------------------------------------\n" );
+      printf("It is currently %s\n\n", buffer);
 
-      d = opendir( "." );
-      c = 0;
-      while ((de = readdir(d))){
-          if ((de->d_type) & DT_DIR) 
-             printf( " ( %d Directory:  %s ) \n", c++, de->d_name);	  
-      }
-      closedir( d );
-      printf( "-----------------------------------------\n" );
- 
+      printf( "\n" );
+
+      //open directory
       d = opendir( "." );
       if (d == NULL) {
             perror("opendir");
             exit(EXIT_FAILURE);
-        }
+      }
+
+      //print files
       c = 0;                    
+      printf("Files:\n");
       while ((de = readdir(d))){                    
           if (((de->d_type) & DT_REG))                              
-             printf( " ( %d File:  %s ) \n", c++, de->d_name);
+             printf( "\t\t%d. %s\n", c++, de->d_name);
           if ( ( c % 5 ) == 0 ) {
              printf( "Hit N for Next\n" );
              k = getchar( );
              }
       }
       closedir( d );
-      printf( "-----------------------------------------\n" );
+      printf( "\n" );
+
+
+      d = opendir( "." );
+      //print directories
+      c = 0;
+      printf("Directories:\n");
+      while ((de = readdir(d))){
+          if ((de->d_type) & DT_DIR){ 
+            //skip "." (cwd)
+            if (strcmp(de->d_name, ".") == 0)
+              continue;
+            printf( "\t\t%d. %s\n", c++, de->d_name);	  
+          }
+      }
+      closedir( d );
+      printf("\n");
+      
+
+      //print operations
+      printf("Operation:          \n\t\t"
+      "D  Display                 \n\t\t"
+      "E  Edit                    \n\t\t"
+      "R  Run                     \n\t\t"
+      "C  Change Directory        \n\t\t"
+      "S  Sort Directory Listing  \n\t\t"
+      "M  Move to Directory       \n\t\t"
+      "R  Remove File             \n\t\t"
+      "Q  Quit                      \n\n"
+      ); 
+ 
+      
+      
   
-      c = getchar( ); getchar( );
-      switch (c) {
-        case 'q': exit(0); /* quit */
+      c = getchar( );
+      switch (tolower(c)) {
+        case 'd':
+                  printf( "Which file would you like to display?");
+                  scanf("%s", s);
+                  strcpy(cmd, "cat ");
+                  strcat(cmd, s);
+                  system(cmd);
+
+
+                  break;
         case 'e': printf( "Edit what?:" );
                   scanf( "%s", s );
                   strcpy( cmd, "pico ");
@@ -102,6 +139,9 @@ int main(void) {
                   scanf( "%s", cmd );
                   chdir( cmd );   
                   break; 
+        case 'q': 
+                  printf("Exiting. Thank you for using this program.\n\n\nDeveloped by Kevin Farokhrouz and Ali Jifi-Bahlool\n\n");
+                  exit(0); /* quit */
       }
        
     }
