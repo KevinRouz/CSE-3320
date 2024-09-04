@@ -20,15 +20,44 @@ int main(void) {
     int i, c, k;
     char s[256], cmd[256];
     time_t t;
+    struct tm *tm_info;
+    char buffer[160];
 
     while (1) {
+      //clear terminal
+      system("clear"); 
 
-      t = time( NULL );
-      printf( "Time: %s\n", ctime( &t ));
+      //print cwd
+      if (getcwd(s, sizeof(s)) == NULL) {
+            perror("getcwd");
+            exit(EXIT_FAILURE);
+      }
+      printf( "\nCurrent Directory: %s \n\n", s);
+
+
+      //get current time
+      t = time(NULL);
+      if (t == -1) {
+        perror("time");
+        exit(EXIT_FAILURE);
+      }
+
+      // Convert time to struct tm
+      tm_info = localtime(&t);
+      if (tm_info == NULL) {
+        perror("localtime");
+        exit(EXIT_FAILURE);
+      } 
+
+      // Format the time
+      if (strftime(buffer, sizeof(buffer), "%d %B %Y, %I:%M %p", tm_info) == 0) {
+        fprintf(stderr, "strftime returned 0");
+        exit(EXIT_FAILURE);
+      }
+
+      // Print the formatted time
+      printf("It is currently %s\n", buffer);
       printf("-----------------------------------------------\n" );
-
-      getcwd(s, 200);
-      printf( "\nCurrent Directory: %s \n", s);
 
       d = opendir( "." );
       c = 0;
@@ -40,6 +69,10 @@ int main(void) {
       printf( "-----------------------------------------\n" );
  
       d = opendir( "." );
+      if (d == NULL) {
+            perror("opendir");
+            exit(EXIT_FAILURE);
+        }
       c = 0;                    
       while ((de = readdir(d))){                    
           if (((de->d_type) & DT_REG))                              
