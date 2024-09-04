@@ -10,176 +10,256 @@
 #include <dirent.h>
 #include <string.h>
 #include <time.h>
-#include <ctype.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <limits.h>
 #include <sys/wait.h>
 
+#define MAX_FILES 1024
+#define BUFFER_SIZE 256
 
-int main(void) {
-    pid_t child;
-    DIR * d;
-    struct dirent * de;
-    int i, c, k, errorcode;
-    char s[256], cmd[256];
-    time_t t;
-    struct tm *tm_info;
-    char buffer[160];
+typedef struct 
+{
+    char name[BUFFER_SIZE];
+    off_t size;
+    time_t mtime;
+    mode_t mode;
+} FileEntry;
 
+FileEntry file_list[MAX_FILES];
+int file_count = 0;
+int current_start = 0;
 
-    //clear terminal
-    system("clear"); 
-    while (1) {
-      
-
-      //print cwd
-      if (getcwd(s, sizeof(s)) == NULL) {
-            perror("getcwd");
-            exit(EXIT_FAILURE);
-      }
-      printf("\n\n---\n");
-      printf( "\nCurrent Directory: %s \n\n", s);
-
-
-      //get current time
-      t = time(NULL);
-      if (t == -1) {
+//display current time
+void display_time() 
+{
+    time_t t = time(NULL);
+    if (t == -1) 
+    {
         perror("time");
-        exit(EXIT_FAILURE);
-      }
-
-      // Convert time to struct tm
-      tm_info = localtime(&t);
-      if (tm_info == NULL) {
-        perror("localtime");
-        exit(EXIT_FAILURE);
-      } 
-
-      // Format the time
-      if (strftime(buffer, sizeof(buffer), "%d %B %Y, %I:%M %p", tm_info) == 0) {
-        fprintf(stderr, "strftime returned 0");
-        exit(EXIT_FAILURE);
-      }
-
-      // Print the formatted time
-      printf("It is currently %s\n\n", buffer);
-
-      printf( "\n" );
-
-      //open directory
-      d = opendir( "." );
-      if (d == NULL) {
-            perror("opendir");
-            exit(EXIT_FAILURE);
-      }
-
-      //print files
-      //TODO: Implement the pages for viewing files and directories.
-      c = 0;                    
-      printf("Files:\n");
-      while ((de = readdir(d))){                    
-          if (((de->d_type) & DT_REG))                              
-             printf( "\t\t%d. %s\n", c++, de->d_name);
-          if ( ( c % 5 ) == 0 ) {
-             printf( "Hit N for Next\n" );
-             k = getchar( );
-             }
-      }
-      closedir( d );
-      printf( "\n" );
-
-
-      d = opendir( "." );
-      //print directories
-      c = 0;
-      printf("Directories:\n");
-      while ((de = readdir(d))){
-          if ((de->d_type) & DT_DIR){ 
-            //skip "." (cwd)
-            if (strcmp(de->d_name, ".") == 0)
-              continue;
-            printf( "\t\t%d. %s\n", c++, de->d_name);	  
-          }
-      }
-      closedir( d );
-      printf("\n");
-      
-
-      //print operations
-      printf("Operation:          \n\t\t"
-      "D  Display                 \n\t\t"
-      "E  Edit                    \n\t\t"
-      "R  Run                     \n\t\t"
-      "C  Change Directory        \n\t\t"
-      "S  Sort Directory Listing  \n\t\t"
-      "M  Move to Directory       \n\t\t"
-      "V  Remove File             \n\t\t"
-      "Q  Quit                      \n\n"
-      ); 
-      printf("\n");
-      
-      
-
-      c = getchar( ); 
-      getchar();
-      printf("\n");
-      switch (tolower(c)) {
-        case 'd':
-                  printf("Which file would you like to display?\n\n");
-                  scanf("%s", s);
-                  getchar();
-                  strcpy(cmd, "cat ");
-                  strcat(cmd, s);
-                  printf("\nFile contents:\n\n");
-                  errorcode = system(cmd);
-                  if(errorcode != 0)
-                    printf("Ensure file %s exists. Typo?", s);
-                  break;
-        case 'e': printf("What file would you like to edit?\n\n");
-                  scanf("%s", s);
-                  getchar();
-                  strcpy( cmd, "nano ");
-                  strcat( cmd, s );
-                  errorcode = system( cmd );
-                  if(errorcode != 0)
-                    printf("Something went wrong while editing.");
-                  else
-                    printf("Edited file %s successfully.", s);
-                  
-                  break;
-        case 'r': printf("Which file would you like to run?\n\n");
-                  scanf( "%s", s );
-                  getchar();
-                  strcpy(cmd, "./");
-                  strcat(cmd, s);
-                  errorcode = system(cmd);
-                  if (WIFSIGNALED(errorcode) && WTERMSIG(errorcode) == SIGINT) {
-                      printf("\n\nProgram %s was interrupted by Ctrl+C.\n", s);
-                  } else if (errorcode != 0) {
-                      printf("Could not run %s. Ensure the file is executable.\n", s);
-                  } else {
-                      printf("Ran file %s successfully.\n", s);
-                  }
-                  break;
-        case 'c': printf( "Change To?:" );
-                  scanf( "%s", cmd );
-                  getchar();
-                  chdir( cmd );   
-                  break; 
-        case 's':
-                  //TODO: sort directory listing
-                  break;
-        case 'm':
-                  //TODO: move to directory
-                  break;
-        case 'v':
-                  //TODO: remove file
-                  break;
-        case 'q': 
-                  printf("Exiting. Thank you for using this program.\n\n\nDeveloped by Kevin Farokhrouz and Ali Jifi-Bahlool\n\n");
-                  exit(0); /* quit */
-        default:
-                  printf("Didn't recognize that command. Try again.\n");
-                  break;
-      }
-       
+        return;
     }
+
+    struct tm *tm_info = localtime(&t);
+    if (tm_info == NULL) 
+    {
+        perror("localtime");
+        return;
+    }
+
+    char buffer[BUFFER_SIZE];
+    if (strftime(buffer, sizeof(buffer), "%d %B %Y, %I:%M %p", tm_info) == 0) 
+    {
+        fprintf(stderr, "Error formatting time\n");
+        return;
+    }
+
+    printf("It is currently %s\n", buffer);
+}
+
+//list directory contents
+void list_directory_contents() 
+{
+    DIR *d = opendir(".");
+    if (d == NULL) 
+    {
+        perror("opendir");
+        return;
+    }
+
+    struct dirent *de;
+    file_count = 0;
+
+    while ((de = readdir(d)) && file_count < MAX_FILES) 
+    {
+        struct stat st;
+        if (stat(de->d_name, &st) == 0) 
+        {
+            strncpy(file_list[file_count].name, de->d_name, BUFFER_SIZE);
+            file_list[file_count].size = st.st_size;
+            file_list[file_count].mtime = st.st_mtime;
+            file_list[file_count].mode = st.st_mode;
+            file_count++;
+        }
+    }
+    closedir(d);
+}
+
+//sorting functions
+int compare_by_name(const void *a, const void *b) 
+{
+    return strcmp(((FileEntry *)a)->name, ((FileEntry *)b)->name);
+}
+
+int compare_by_size(const void *a, const void *b) 
+{
+    return ((FileEntry *)a)->size - ((FileEntry *)b)->size;
+}
+
+int compare_by_date(const void *a, const void *b) 
+{
+    return ((FileEntry *)a)->mtime - ((FileEntry *)b)->mtime;
+}
+
+void sort_files(int sort_option) 
+{
+    switch (sort_option) 
+    {
+        case 1:
+            qsort(file_list, file_count, sizeof(FileEntry), compare_by_name);
+            break;
+        case 2:
+            qsort(file_list, file_count, sizeof(FileEntry), compare_by_size);
+            break;
+        case 3:
+            qsort(file_list, file_count, sizeof(FileEntry), compare_by_date);
+            break;
+        default:
+            printf("Invalid sorting option!\n");
+            break;
+    }
+}
+
+//display files with pagination
+void display_files() 
+{
+    printf("Current Directory Contents:\n");
+    for (int i = current_start; i < current_start + 5 && i < file_count; i++) 
+    {
+        char type = (S_ISDIR(file_list[i].mode)) ? 'D' : 'F';
+        printf("%d. [%c] %s (Size: %ld bytes, Date: %s)\n", i, type, file_list[i].name, file_list[i].size, ctime(&file_list[i].mtime));
+    }
+    printf("\n(N)ext, (P)revious, (Q)uit, (S)ort [1-Name, 2-Size, 3-Date]: ");
+}
+
+//edit a file using the users preferred editor
+void edit_file(char *filename) 
+{
+    char *editor = getenv("EDITOR");
+    if (editor == NULL) 
+    {
+        editor = "nano"; //default to nano if EDITOR not set
+    }
+
+    char *args[] = {editor, filename, NULL};
+    pid_t pid = fork();
+    if (pid < 0) 
+    {
+        perror("fork");
+        return;
+    } 
+    else if (pid == 0) 
+    {
+        execvp(editor, args);
+        perror("execvp"); //exec failed case
+        exit(EXIT_FAILURE);
+    } 
+    else 
+    {
+        wait(NULL);
+    }
+}
+
+//run an executable
+void run_file(char *filename) 
+{
+    char *args[] = {filename, NULL};
+    pid_t pid = fork();
+    if (pid < 0) 
+    {
+        perror("fork");
+        return;
+    } 
+    else if (pid == 0) 
+    {
+        execvp(filename, args);
+        perror("execvp");
+        exit(EXIT_FAILURE);
+    } 
+    else 
+    {
+        wait(NULL);
+    }
+}
+
+//change working directory
+void change_directory(char *path) 
+{
+    if (chdir(path) != 0) 
+    {
+        perror("chdir");
+    }
+}
+
+int main(void) 
+{
+    char cmd[BUFFER_SIZE];
+    int ch;
+
+    while (1) 
+    {
+        //clear terminal
+        printf("\033[H\033[J");
+
+        //print current working directory
+        if (getcwd(cmd, sizeof(cmd)) == NULL) 
+        {
+            perror("getcwd");
+            continue;
+        }
+        printf("Current Directory: %s\n", cmd);
+
+        //display current time
+        display_time();
+        printf("-----------------------------------------------\n");
+
+        //list directory contents and display with pagination
+        list_directory_contents();
+        display_files();
+
+        //get user input
+        ch = getchar();
+        while (getchar() != '\n'); //clear input buffer
+
+        switch (ch) 
+        {
+            case 'q': //quit
+                exit(0);
+            case 'n': //next page
+                if (current_start + 5 < file_count) current_start += 5;
+                break;
+            case 'p': //previous page
+                if (current_start - 5 >= 0) current_start -= 5;
+                break;
+            case 's': //sort options
+                printf("\nEnter sorting option (1-Name, 2-Size, 3-Date): ");
+                int sort_option = getchar() - '0';
+                while (getchar() != '\n'); //clear input buffer
+                sort_files(sort_option);
+                break;
+            case 'e': //edit
+                printf("Edit which file?: ");
+                fgets(cmd, BUFFER_SIZE, stdin);
+                cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
+                edit_file(cmd);
+                break;
+            case 'r': //run
+                printf("Run which file?: ");
+                fgets(cmd, BUFFER_SIZE, stdin);
+                cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
+                run_file(cmd);
+                break;
+            case 'c': //change directory
+                printf("Change to directory: ");
+                fgets(cmd, BUFFER_SIZE, stdin);
+                cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
+                change_directory(cmd);
+                break;
+            default:
+                printf("Invalid command!\n");
+                break;
+        }
+    }
+
+    return 0;
 }
