@@ -11,12 +11,14 @@
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
+#include <sys/wait.h>
+
 
 int main(void) {
     pid_t child;
     DIR * d;
     struct dirent * de;
-    int i, c, k;
+    int i, c, k, errorcode;
     char s[256], cmd[256];
     time_t t;
     struct tm *tm_info;
@@ -33,6 +35,7 @@ int main(void) {
             perror("getcwd");
             exit(EXIT_FAILURE);
       }
+      printf("\n\n---\n");
       printf( "\nCurrent Directory: %s \n\n", s);
 
 
@@ -69,6 +72,7 @@ int main(void) {
       }
 
       //print files
+      //TODO: Implement the pages for viewing files and directories.
       c = 0;                    
       printf("Files:\n");
       while ((de = readdir(d))){                    
@@ -107,41 +111,74 @@ int main(void) {
       "C  Change Directory        \n\t\t"
       "S  Sort Directory Listing  \n\t\t"
       "M  Move to Directory       \n\t\t"
-      "R  Remove File             \n\t\t"
+      "V  Remove File             \n\t\t"
       "Q  Quit                      \n\n"
       ); 
- 
+      printf("\n");
       
       
-  
-      c = getchar( );
+
+      c = getchar( ); 
+      getchar();
+      printf("\n");
       switch (tolower(c)) {
         case 'd':
-                  printf( "Which file would you like to display?");
+                  printf("Which file would you like to display?\n\n");
                   scanf("%s", s);
+                  getchar();
                   strcpy(cmd, "cat ");
                   strcat(cmd, s);
-                  system(cmd);
-
-
+                  printf("\nFile contents:\n\n");
+                  errorcode = system(cmd);
+                  if(errorcode != 0)
+                    printf("Ensure file %s exists. Typo?", s);
                   break;
-        case 'e': printf( "Edit what?:" );
-                  scanf( "%s", s );
-                  strcpy( cmd, "pico ");
+        case 'e': printf("What file would you like to edit?\n\n");
+                  scanf("%s", s);
+                  getchar();
+                  strcpy( cmd, "nano ");
                   strcat( cmd, s );
-                  system( cmd );
+                  errorcode = system( cmd );
+                  if(errorcode != 0)
+                    printf("Something went wrong while editing.");
+                  else
+                    printf("Edited file %s successfully.", s);
+                  
                   break;
-        case 'r': printf( "Run what?:" );
-                  scanf( "%s", cmd );
-                  system( cmd );
+        case 'r': printf("Which file would you like to run?\n\n");
+                  scanf( "%s", s );
+                  getchar();
+                  strcpy(cmd, "./");
+                  strcat(cmd, s);
+                  errorcode = system(cmd);
+                  if (WIFSIGNALED(errorcode) && WTERMSIG(errorcode) == SIGINT) {
+                      printf("\n\nProgram %s was interrupted by Ctrl+C.\n", s);
+                  } else if (errorcode != 0) {
+                      printf("Could not run %s. Ensure the file is executable.\n", s);
+                  } else {
+                      printf("Ran file %s successfully.\n", s);
+                  }
                   break;
         case 'c': printf( "Change To?:" );
                   scanf( "%s", cmd );
+                  getchar();
                   chdir( cmd );   
                   break; 
+        case 's':
+                  //TODO: sort directory listing
+                  break;
+        case 'm':
+                  //TODO: move to directory
+                  break;
+        case 'v':
+                  //TODO: remove file
+                  break;
         case 'q': 
                   printf("Exiting. Thank you for using this program.\n\n\nDeveloped by Kevin Farokhrouz and Ali Jifi-Bahlool\n\n");
                   exit(0); /* quit */
+        default:
+                  printf("Didn't recognize that command. Try again.\n");
+                  break;
       }
        
     }
