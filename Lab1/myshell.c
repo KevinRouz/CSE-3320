@@ -167,17 +167,20 @@ void edit_file(char *filename)
     if (pid < 0) 
     {
         perror("fork");
+        snprintf(message, BUFFER_SIZE, "Something went wrong, could not edit %s.", filename);
         return;
     } 
     else if (pid == 0) 
     {
         execvp(editor, args);
+        snprintf(message, BUFFER_SIZE, "Something went wrong, could not edit %s.", filename);
         perror("execvp"); //exec failed case
         exit(EXIT_FAILURE);
     } 
     else 
     {
         wait(NULL);
+        snprintf(message, BUFFER_SIZE, "Successfully edited %s.", filename);
     }
 }
 
@@ -300,8 +303,12 @@ void change_directory(char *path)
     }
 }
 
-int main(void) 
+int main(int argc, char **argv) 
 {
+    //if called with arguments, set the starting directory to the argument.
+    if(argc == 2)
+        change_directory(argv[1]);
+
     char cmd[BUFFER_SIZE];
     int ch;
 
