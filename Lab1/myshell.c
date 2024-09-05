@@ -332,9 +332,11 @@ int main(void)
 
         //print message from the previous command, then clears the message.
         if(strlen(message) > 0){
-            printf("%s\n", message);
+            printf("%s\n\n", message);
             strcpy(message, "");
         }
+
+        printf("What would you like to do? ");
 
         //get user input
         ch = getchar();
