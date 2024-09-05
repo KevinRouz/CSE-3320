@@ -14,9 +14,13 @@
 #include <errno.h>
 #include <limits.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 #define MAX_FILES 1024
-#define BUFFER_SIZE 256
+#define BUFFER_SIZE 512
+
+//declare global variable message, that can be used to display a message next time the screen is refreshed.
+char message[BUFFER_SIZE] = "";
 
 typedef struct 
 {
@@ -58,7 +62,7 @@ void display_time()
 }
 
 //list directory contents
-void list_directory_contents() 
+void get_directory_contents() 
 {
     DIR *d = opendir(".");
     if (d == NULL) 
@@ -75,6 +79,8 @@ void list_directory_contents()
         struct stat st;
         if (stat(de->d_name, &st) == 0) 
         {
+            if(strcmp(de->d_name, ".") == 0)
+                continue;
             strncpy(file_list[file_count].name, de->d_name, BUFFER_SIZE);
             file_list[file_count].size = st.st_size;
             file_list[file_count].mtime = st.st_mtime;
@@ -102,7 +108,7 @@ int compare_by_date(const void *a, const void *b)
 }
 
 void sort_files(int sort_option) 
-{
+{   
     switch (sort_option) 
     {
         case 1:
@@ -121,15 +127,26 @@ void sort_files(int sort_option)
 }
 
 //display files with pagination
-void display_files() 
+void display_contents() 
 {
-    printf("Current Directory Contents:\n");
+    printf("Current Directory Contents:\n\n");
     for (int i = current_start; i < current_start + 5 && i < file_count; i++) 
     {
-        char type = (S_ISDIR(file_list[i].mode)) ? 'D' : 'F';
-        printf("%d. [%c] %s (Size: %ld bytes, Date: %s)\n", i, type, file_list[i].name, file_list[i].size, ctime(&file_list[i].mtime));
+        char *type = (S_ISDIR(file_list[i].mode)) ? "Directory" : "File";
+        printf("%d. [%s] %s \tSize: %ld bytes, Date: %s", i, type, file_list[i].name, file_list[i].size, ctime(&file_list[i].mtime));
     }
-    printf("\n(N)ext, (P)revious, (Q)uit, (S)ort [1-Name, 2-Size, 3-Date]: ");
+    printf("\n\nOperation:          \n\t\t"  
+        "N  Next page               \n\t\t"
+        "B  Previous page           \n\t\t"
+        "D  Display                 \n\t\t"
+        "E  Edit                    \n\t\t"
+        "R  Run                     \n\t\t"
+        "C  Change Directory        \n\t\t"
+        "S  Sort Directory Listing  \n\t\t"
+        "M  Move to Directory       \n\t\t"
+        "V  Remove File             \n\t\t"
+        "Q  Quit                      \n\n"
+    );
 }
 
 //edit a file using the users preferred editor
@@ -160,27 +177,108 @@ void edit_file(char *filename)
     }
 }
 
+void signal_handler(int sig) {
+    // Empty signal handler to ignore SIGINT
+}
+
 //run an executable
 void run_file(char *filename) 
 {
     char *args[] = {filename, NULL};
     pid_t pid = fork();
+    
     if (pid < 0) 
     {
-        perror("fork");
+        snprintf(message, BUFFER_SIZE, "FORK: Could not create process for %s.", filename);
         return;
     } 
     else if (pid == 0) 
     {
-        execvp(filename, args);
-        perror("execvp");
+        // Child process
+        signal(SIGINT, SIG_DFL); // Default action for SIGINT (terminate)
+        
+        // Prepend "./" to the filename to indicate it is in the current directory
+        char filepath[BUFFER_SIZE];
+        snprintf(filepath, BUFFER_SIZE, "./%s", filename);
+        
+        execvp(filepath, args);
+        
+        // If execvp fails, format an error message and exit the child process
+        snprintf(message, BUFFER_SIZE, "EXECVP: Could not execute %s.", filename);
+        perror(message); // Print error to stderr
         exit(EXIT_FAILURE);
     } 
     else 
     {
-        wait(NULL);
+        // Parent process
+        signal(SIGINT, signal_handler); // Ignore SIGINT in the parent
+        
+        int status;
+        if (waitpid(pid, &status, 0) == -1) 
+        {
+            snprintf(message, BUFFER_SIZE, "WAITPID: Error waiting for %s.", filename);
+            return;
+        }
+
+        if (WIFSIGNALED(status)) 
+        {
+            if (WTERMSIG(status) == SIGINT) 
+            {
+                snprintf(message, BUFFER_SIZE, "INTERRUPTED: %s was terminated by Ctrl+C.", filename);
+            } 
+            else 
+            {
+                snprintf(message, BUFFER_SIZE, "FAILURE: %s was terminated by signal %d.", filename, WTERMSIG(status));
+            }
+        } 
+        else if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+        {
+            snprintf(message, BUFFER_SIZE, "SUCCESS: %s executed successfully.", filename);
+        }
+        else
+        {
+            snprintf(message, BUFFER_SIZE, "FAILURE: %s did not execute successfully.", filename);
+        }
+
+        // Restore default handling of SIGINT
+        signal(SIGINT, SIG_DFL);
     }
 }
+
+
+//removes a file
+void remove_file(const char * filename)
+{
+
+    FILE *file = fopen(filename, "w");
+    if (remove(filename) == 0) 
+    {
+        snprintf(message, BUFFER_SIZE, "File %s successfully deleted.\n", filename);
+    } 
+    else 
+    {
+        snprintf(message, BUFFER_SIZE, "Error deleting file %s.\n", filename);
+    }
+}
+
+//displays a file
+void display_file(const char* filename) 
+{ 
+    FILE *file = fopen(filename, "r"); 
+    if (file == NULL) { 
+        printf("Unable to open file %s\n", filename); 
+        return; 
+    } 
+  
+    // Read and print the file 
+    char ch; 
+    while ((ch = fgetc(file)) != EOF) { 
+        putchar(ch); 
+    } 
+    printf("\n\n");
+    // Close the file 
+    fclose(file); 
+} 
 
 //change working directory
 void change_directory(char *path) 
@@ -196,6 +294,9 @@ int main(void)
     char cmd[BUFFER_SIZE];
     int ch;
 
+    //create a list of the current directory's contents
+    get_directory_contents();
+
     while (1) 
     {
         //clear terminal
@@ -207,15 +308,22 @@ int main(void)
             perror("getcwd");
             continue;
         }
+        
+
         printf("Current Directory: %s\n", cmd);
 
         //display current time
         display_time();
-        printf("-----------------------------------------------\n");
+        printf("---\n");
 
-        //list directory contents and display with pagination
-        list_directory_contents();
-        display_files();
+        //display the contents of the cwd with pagination
+        display_contents();
+
+        //print message from the previous command, then clears the message.
+        if(strlen(message) > 0){
+            printf("%s\n", message);
+            strcpy(message, "");
+        }
 
         //get user input
         ch = getchar();
@@ -224,39 +332,87 @@ int main(void)
         switch (ch) 
         {
             case 'q': //quit
+                printf("Exiting. Thank you for using this program.\n\n\nDeveloped by Kevin Farokhrouz and Ali Jifi-Bahlool\n\n");
                 exit(0);
             case 'n': //next page
-                if (current_start + 5 < file_count) current_start += 5;
+                if (current_start + 5 < file_count) {
+                    current_start += 5;
+                } else {
+                    strcpy(message,"No more pages.");
+                }
                 break;
-            case 'p': //previous page
-                if (current_start - 5 >= 0) current_start -= 5;
+            case 'b': //previous page
+                if (current_start - 5 >= 0) {
+                    current_start -= 5;
+                } else {
+                    strcpy(message,"Already on the first page.");
+                }
                 break;
             case 's': //sort options
-                printf("\nEnter sorting option (1-Name, 2-Size, 3-Date): ");
-                int sort_option = getchar() - '0';
-                while (getchar() != '\n'); //clear input buffer
-                sort_files(sort_option);
+                while (1){ 
+                    //loops until valid input
+                    printf("\nEnter sorting option (1-Name, 2-Size, 3-Date): ");
+                    int sort_option = getchar() - '0';
+                    while (getchar() != '\n'); //clear input buffer
+                    if (sort_option >= 1 && sort_option <= 3) {
+                        sort_files(sort_option); // Sort the file list based on the chosen option
+                        current_start = 0; // Reset the pagination start
+                        break;
+                    } else {
+                        printf("Invalid sorting option! Please choose 1, 2, or 3.\n");
+                    }
+                }
                 break;
             case 'e': //edit
-                printf("Edit which file?: ");
+                printf("Which file would you like to edit? ");
                 fgets(cmd, BUFFER_SIZE, stdin);
                 cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
                 edit_file(cmd);
+                //create a list of the new cwd's contents
+                get_directory_contents();
+                //reset the start of the pagination
+                current_start = 0;
                 break;
             case 'r': //run
-                printf("Run which file?: ");
+                printf("Which file would you like to run? ");
                 fgets(cmd, BUFFER_SIZE, stdin);
                 cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
                 run_file(cmd);
+                printf("MESSAGE after run: %s", message);
                 break;
+            case 'm': //move to directory
             case 'c': //change directory
-                printf("Change to directory: ");
+                printf("Which directory would you like to move to? ");
                 fgets(cmd, BUFFER_SIZE, stdin);
                 cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
                 change_directory(cmd);
+                //create a list of the new cwd's contents
+                get_directory_contents();
+                //reset the start of the pagination
+                current_start = 0;
+                break;
+            case 'd': //display file
+                printf("Which file would you like to display? ");
+                fgets(cmd, BUFFER_SIZE, stdin);
+                cmd[strcspn(cmd, "\n")] = '\0';
+                printf("File contents:\n\n");
+                display_file(cmd);
+                printf("Press any key to continue. ");
+                ch = getchar();
+                while (getchar() != '\n');
+                break;
+            case 'v': //remove file
+                printf("Which file would you like to remove? ");
+                fgets(cmd, BUFFER_SIZE, stdin);
+                cmd[strcspn(cmd, "\n")] = '\0';
+                remove_file(cmd);
+                //create a list of the new cwd's contents
+                get_directory_contents();
+                //reset the start of the pagination
+                current_start = 0;
                 break;
             default:
-                printf("Invalid command!\n");
+                strcpy(message, "Invalid command!");
                 break;
         }
     }
