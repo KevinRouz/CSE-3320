@@ -22,6 +22,7 @@
 //declare global variable message, that can be used to display a message next time the screen is refreshed.
 char message[BUFFER_SIZE] = "";
 
+//Struct used for file entries
 typedef struct 
 {
     char name[BUFFER_SIZE];
@@ -51,6 +52,8 @@ void display_time()
         return;
     }
 
+
+    //convert time to nice format
     char buffer[BUFFER_SIZE];
     if (strftime(buffer, sizeof(buffer), "%d %B %Y, %I:%M %p", tm_info) == 0) 
     {
@@ -74,6 +77,7 @@ void get_directory_contents()
     struct dirent *de;
     file_count = 0;
 
+    //Set file entry info for each entry
     while ((de = readdir(d)) && file_count < MAX_FILES) 
     {
         struct stat st;
@@ -91,7 +95,7 @@ void get_directory_contents()
     closedir(d);
 }
 
-//sorting functions
+//sorting functions, to be used by qsort
 int compare_by_name(const void *a, const void *b) 
 {
     return strcmp(((FileEntry *)a)->name, ((FileEntry *)b)->name);
@@ -177,6 +181,7 @@ void edit_file(char *filename)
     }
 }
 
+//used during run_file, to capture ctrl c interrupt properly instead of printing generic failure
 void signal_handler(int sig) {
     // Empty signal handler to ignore SIGINT
 }
@@ -185,8 +190,11 @@ void signal_handler(int sig) {
 void run_file(char *filename) 
 {
     char *args[] = {filename, NULL};
+    
+    //creates a fork
     pid_t pid = fork();
     
+    //Something went wrong, print error message
     if (pid < 0) 
     {
         snprintf(message, BUFFER_SIZE, "FORK: Could not create process for %s.", filename);
@@ -195,7 +203,9 @@ void run_file(char *filename)
     else if (pid == 0) 
     {
         // Child process
-        signal(SIGINT, SIG_DFL); // Default action for SIGINT (terminate)
+
+        //Sets the Default action for SIGINT (terminate), in case it was set to signal_handler
+        signal(SIGINT, SIG_DFL); 
         
         // Prepend "./" to the filename to indicate it is in the current directory
         char filepath[BUFFER_SIZE];
@@ -220,6 +230,7 @@ void run_file(char *filename)
             return;
         }
 
+        //Capture an interrupt properly
         if (WIFSIGNALED(status)) 
         {
             if (WTERMSIG(status) == SIGINT) 
@@ -230,7 +241,7 @@ void run_file(char *filename)
             {
                 snprintf(message, BUFFER_SIZE, "FAILURE: %s was terminated by signal %d.", filename, WTERMSIG(status));
             }
-        } 
+        } //otherwise capture a normal success or failure
         else if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
         {
             snprintf(message, BUFFER_SIZE, "SUCCESS: %s executed successfully.", filename);
@@ -335,16 +346,18 @@ int main(void)
                 printf("Exiting. Thank you for using this program.\n\n\nDeveloped by Kevin Farokhrouz and Ali Jifi-Bahlool\n\n");
                 exit(0);
             case 'n': //next page
+                //make sure not to go past the length of the file count.
                 if (current_start + 5 < file_count) {
                     current_start += 5;
-                } else {
+                } else {//otherwise prevent user from going below zero- already at the last page
                     strcpy(message,"No more pages.");
                 }
                 break;
             case 'b': //previous page
+                //make sure not to go below zero
                 if (current_start - 5 >= 0) {
                     current_start -= 5;
-                } else {
+                } else {//otherwise prevent user from going past the last page
                     strcpy(message,"Already on the first page.");
                 }
                 break;
@@ -368,9 +381,9 @@ int main(void)
                 fgets(cmd, BUFFER_SIZE, stdin);
                 cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
                 edit_file(cmd);
-                //create a list of the new cwd's contents
+                //create a list of the directory contents- important if the user just created a new file.
                 get_directory_contents();
-                //reset the start of the pagination
+                //reset the start of the pagination since we created a new list
                 current_start = 0;
                 break;
             case 'r': //run
@@ -378,6 +391,10 @@ int main(void)
                 fgets(cmd, BUFFER_SIZE, stdin);
                 cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
                 run_file(cmd);
+                //create a list of the directory contents- important if the user just created a new file.
+                get_directory_contents();
+                //reset the start of the pagination since we created a new list
+                current_start = 0;
                 printf("MESSAGE after run: %s", message);
                 break;
             case 'm': //move to directory
@@ -388,7 +405,7 @@ int main(void)
                 change_directory(cmd);
                 //create a list of the new cwd's contents
                 get_directory_contents();
-                //reset the start of the pagination
+                //reset the start of the pagination since the list is new
                 current_start = 0;
                 break;
             case 'd': //display file
@@ -406,9 +423,9 @@ int main(void)
                 fgets(cmd, BUFFER_SIZE, stdin);
                 cmd[strcspn(cmd, "\n")] = '\0';
                 remove_file(cmd);
-                //create a list of the new cwd's contents
+                //create a list of the directory contents since the user removed a file
                 get_directory_contents();
-                //reset the start of the pagination
+                //reset the start of the pagination since we created a new list
                 current_start = 0;
                 break;
             default:
