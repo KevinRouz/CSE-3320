@@ -1,7 +1,7 @@
-// Kevin Farokhrouz
-// Ali Jifi-Bahlool
-// CSE 3320-001
-// Lab 1
+//Kevin Farokhrouz
+//Ali Jifi-Bahlool
+//CSE 3320-001
+//Lab 1
 
 #include <sys/types.h>
 #include <stdlib.h>
