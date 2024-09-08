@@ -339,17 +339,11 @@ int main(int argc, char **argv)
             strcpy(message, "");
         }
 
-<<<<<<< HEAD
         printf("What would you like to do? ");
 
         //get user input
         ch = getchar();
         while (getchar() != '\n'); //clear input buffer
-=======
-    //get user input
-    ch = getchar();
-    while (getchar() != '\n'); //clear input buffer
->>>>>>> 9f02df29f913f842bf2aed1130b5c4311d7798f9
 
     switch (ch)
     {
@@ -435,9 +429,10 @@ int main(int argc, char **argv)
         cmd[strcspn(cmd, "\n")] = '\0';
         printf("File contents:\n\n");
         display_file(cmd);
-        printf("Press any key to continue. ");
+        printf("Press Enter to continue. ");
         ch = getchar();
-        while (getchar() != '\n');
+        if(ch != '\n') //Ensures enter doesn't have to be pressed twice
+          while (getchar() != '\n'); //clears stdin
         break;
       case 'v': //remove file
         printf("Which file would you like to remove? ");
