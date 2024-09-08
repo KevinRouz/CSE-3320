@@ -161,23 +161,23 @@ void edit_file(char *filename)
     editor = "nano"; //default to nano if EDITOR not set
   }
 
-  char *args[] = {editor, filename, NULL};
-  pid_t pid = fork();
-  if (pid < 0)
-  {
-    perror("fork");
-    return;
-  }
-  else if (pid == 0)
-  {
-    execvp(editor, args);
-    perror("execvp");  //exec failed case
-    exit(EXIT_FAILURE);
-  }
-  else
-  {
-    wait(NULL);
-  }
+    char *args[] = {editor, filename, NULL};
+    pid_t pid = fork();
+    if (pid < 0) 
+    {
+        perror("fork");
+        return;
+    } 
+    else if (pid == 0) 
+    {
+        execvp(editor, args);
+        perror("execvp"); //exec failed case
+        exit(EXIT_FAILURE);
+    } 
+    else 
+    {
+        wait(NULL);
+    }
 }
 
 //used during run_file, to capture ctrl c interrupt properly instead of printing generic failure
@@ -298,10 +298,10 @@ void change_directory(char *path)
   }
 }
 
-int main(void)
+int main(void) 
 {
-  char cmd[BUFFER_SIZE];
-  int ch;
+    char cmd[BUFFER_SIZE];
+    int ch;
 
   //create a list of the current directory's contents
   get_directory_contents();
@@ -326,12 +326,11 @@ int main(void)
     //display the contents of the cwd with pagination
     display_contents();
 
-    //print message from the previous command, then clears the message.
-    if (strlen(message) > 0)
-    {
-      printf("%s\n", message);
-      strcpy(message, "");
-    }
+        //print message from the previous command, then clears the message.
+        if(strlen(message) > 0){
+            printf("%s\n", message);
+            strcpy(message, "");
+        }
 
     //get user input
     ch = getchar();
