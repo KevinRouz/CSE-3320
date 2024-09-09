@@ -16,14 +16,14 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define MAX_FILES 1024
-#define BUFFER_SIZE 512
+#define MAX_FILES 1024 //max number of files in file_list array
+#define BUFFER_SIZE 512 //max buffer size to temp store data
 
 //declare global variable message, that can be used to display a message next time the screen is refreshed
 //basically a global char array used to store messages after each operation
 char message[BUFFER_SIZE] = "";
 
-//struct used for file entries
+//struct used for file entries in cwd
 typedef struct
 {
   char name[BUFFER_SIZE];
@@ -34,25 +34,26 @@ typedef struct
 
 //array of FileEntry structs that hold info about files and directories in the cwd
 FileEntry file_list[MAX_FILES];
-int file_count = 0;
+int file_count = 0; //number of files stored in file_list array
 int current_start = 0; //controls which set of files is displayed
 
-//display current time
+// retrieves and displays current time
 void display_time()
 {
   time_t t = time(NULL);
   if (t == -1)
   {
-    perror("time");
+    perror("time error, could not retrieve time");
     return;
   }
-
-  struct tm *tm_info = localtime(&t);
+//use of perror instead of printf to print error message, directly uses errno to print more accurate error messages
+  struct tm *tm_info = localtime(&t); 
   if (tm_info == NULL)
   {
-    perror("localtime");
+    perror("localtime, could not convert to local time");
     return;
   }
+  //error creating time struct, ex: month, day, year
 
   //clean up time display format
   char buffer[BUFFER_SIZE];
@@ -67,66 +68,69 @@ void display_time()
 //list directory contents
 void get_directory_contents()
 {
-  DIR *d = opendir(".");
+  DIR *d = opendir("."); //opens cwd, returns pointer to directory stream, a data structure used to represent a directory 
   if (d == NULL)
   {
-    perror("opendir");
+    perror("opendir, could not open directory to read and display contents");
     return;
   }
 
-  struct dirent *de;
-  file_count = 0;
+  struct dirent *de; //pointer to hold directory entries already read by readdir
+  file_count = 0; //number of files read, resets to zero every function call
 
-  //set file entry info for each entry
+  //set file info for each entry to a pointer containing the file info, continues until file_list reaches max size
   while ((de = readdir(d)) && file_count < MAX_FILES)
   {
-    struct stat st;
-    if (stat(de->d_name, &st) == 0)
+    struct stat st; //struct variable to hold detailed info about each file
+    if (stat(de->d_name, &st) == 0) //fill st struct with file info, if not 0 (error) skip
     {
-      if (strcmp(de->d_name, ".") == 0)
+      if (strcmp(de->d_name, ".") == 0) //skip cwd entry 
         continue;
-      strncpy(file_list[file_count].name, de->d_name, BUFFER_SIZE);
-      file_list[file_count].size = st.st_size;
-      file_list[file_count].mtime = st.st_mtime;
-      file_list[file_count].mode = st.st_mode;
-      file_count++;
+      strncpy(file_list[file_count].name, de->d_name, BUFFER_SIZE); //copy cwd entry into name field, only use buffer_size to avoid buffer overflow
+      file_list[file_count].size = st.st_size; //copy file size field
+      file_list[file_count].mtime = st.st_mtime; //copy file modification time 
+      file_list[file_count].mode = st.st_mode; //copy file mode field (file type, permissions)
+      file_count++; //increment file count to move to next entry
     }
   }
-  closedir(d);
+  closedir(d); //close directory stream 
 }
 
 //sorting functions, to be used by qsort
-int compare_by_name(const void *a, const void *b)
+//+ if first file is greater/larger/later
+//= if files are equal in size, date, or name
+//- if first file is lesser/smaller/earlier
+int compare_by_name(const void *a, const void *b) //sort by name, compare two FileEntry structs by name fields
 {
   return strcmp(((FileEntry *)a)->name, ((FileEntry *)b)->name);
 }
 
-int compare_by_size(const void *a, const void *b)
+int compare_by_size(const void *a, const void *b) //sort by size, compare two FileEntry structs by size fields
 {
   return ((FileEntry *)a)->size - ((FileEntry *)b)->size;
 }
 
-int compare_by_date(const void *a, const void *b)
+int compare_by_date(const void *a, const void *b) //sort by date, compare two FileEntry structs by date fields
 {
   return ((FileEntry *)a)->mtime - ((FileEntry *)b)->mtime;
 }
 
-void sort_files(int sort_option)
+void sort_files(int sort_option) //chooses comparsion function based on user input, "sort_option"
 {
   switch (sort_option)
   {
-  case 1:
-    qsort(file_list, file_count, sizeof(FileEntry), compare_by_name);
-    break;
-  case 2:
-    qsort(file_list, file_count, sizeof(FileEntry), compare_by_size);
-    break;
-  case 3:
-    qsort(file_list, file_count, sizeof(FileEntry), compare_by_date);
-    break;
-  default:
-    printf("Invalid sorting option!\n");
-    break;
+    case 1:
+      qsort(file_list, file_count, sizeof(FileEntry), compare_by_name); //compare alphabetically
+      break;
+    case 2:
+      qsort(file_list, file_count, sizeof(FileEntry), compare_by_size); //compare size
+      break;
+    case 3:
+      qsort(file_list, file_count, sizeof(FileEntry), compare_by_date); //compare modification time
+      break;
+    default:
+      printf("Invalid sorting option!\n"); 
+      break;
   }
 }
 
@@ -134,10 +138,11 @@ void sort_files(int sort_option)
 void display_contents()
 {
   printf("Current Directory Contents:\n\n");
+  // //iterate through the file_list array and display file details, loop thru first 5 entries, increment or decrement current_start to display next or past 5 entries 
   for (int i = current_start; i < current_start + 5 && i < file_count; i++)
   {
-    char *type = (S_ISDIR(file_list[i].mode)) ? "Directory" : "File";
-    printf("%d. [%s] %s \tSize: %ld bytes, Date: %s", i, type, file_list[i].name, file_list[i].size, ctime(&file_list[i].mtime));
+    char *type = (S_ISDIR(file_list[i].mode)) ? "Directory" : "File"; //checks if directory or file, marco
+    printf("%d. [%s] %s \tSize: %ld bytes, Date: %s", i, type, file_list[i].name, file_list[i].size, ctime(&file_list[i].mtime)); //displays index number, type, name, size, and date
   }
   printf("\n\nOperation:          \n\t\t"
          "N  Next page               \n\t\t"
@@ -149,7 +154,7 @@ void display_contents()
          "S  Sort Directory Listing  \n\t\t"
          "M  Move to Directory       \n\t\t"
          "V  Remove File             \n\t\t"
-         "Q  Quit                      \n\n");
+         "Q  Quit                      \n\n"); //displays available commands to the user
 }
 
 //edit a file using the users preferred editor
@@ -161,15 +166,15 @@ void edit_file(char *filename)
     editor = "nano"; //default to nano if EDITOR not set
   }
 
-    char *args[] = {editor, filename, NULL};
-    pid_t pid = fork();
-    if (pid < 0) 
+    char *args[] = {editor, filename, NULL}; //
+    pid_t pid = fork(); //fork creates new process, for editing
+    if (pid < 0) //if negative, error creating new process
     {
         perror("fork");
         snprintf(message, BUFFER_SIZE, "Something went wrong, could not edit %s.", filename);
-        return;
+        return; //return to parent
     } 
-    else if (pid == 0) 
+    else if (pid == 0) //if zero, error with execvp
     {
         execvp(editor, args);
         snprintf(message, BUFFER_SIZE, "Something went wrong, could not edit %s.", filename);
@@ -178,7 +183,7 @@ void edit_file(char *filename)
     } 
     else 
     {
-        wait(NULL);
+        wait(NULL); //shell (parent) doesnt execute other commands while editing 
         snprintf(message, BUFFER_SIZE, "Successfully edited %s.", filename);
     }
 }
@@ -194,10 +199,10 @@ void run_file(char *filename)
 {
   char *args[] = {filename, NULL};
 
-  //create fork
+  //create fork to run executable
   pid_t pid = fork();
 
-  //print error message if error
+  //print error message if error, could not run executable
   if (pid < 0)
   {
     snprintf(message, BUFFER_SIZE, "FORK: Could not create process for %s.", filename);
@@ -208,23 +213,23 @@ void run_file(char *filename)
     //sets default action for SIGINT (terminate), in case it was set to signal_handler
     signal(SIGINT, SIG_DFL);
 
-    //prepend "./" to the filename to indicate it is in the current directory
+    //prepend "./" to the filename to indicate it is in the cwd
     char filepath[BUFFER_SIZE];
     snprintf(filepath, BUFFER_SIZE, "./%s", filename);
 
-    execvp(filepath, args);
+    execvp(filepath, args); //attempt to execute file
 
     //if execvp fails, format error message and exit
     snprintf(message, BUFFER_SIZE, "EXECVP: Could not execute %s.", filename);
-    perror(message); // print error to stderr
+    perror(message); //print error to stderr
     exit(EXIT_FAILURE);
   }
   else
   {
-    signal(SIGINT, signal_handler); //ignore SIGINT in else
+    signal(SIGINT, signal_handler); //ignore SIGINT in parent function
 
     int status;
-    if (waitpid(pid, &status, 0) == -1)
+    if (waitpid(pid, &status, 0) == -1) //wait for fork (child)
     {
       snprintf(message, BUFFER_SIZE, "WAITPID: Error waiting for %s.", filename);
       return;
@@ -256,28 +261,28 @@ void run_file(char *filename)
   }
 }
 
-//removes a file
+//removes file
 void remove_file(const char *filename)
 {
 
-  FILE *file = fopen(filename, "w");
+  FILE *file = fopen(filename, "w"); //open file
   if (remove(filename) == 0)
   {
-    snprintf(message, BUFFER_SIZE, "File %s successfully deleted.\n", filename);
+    snprintf(message, BUFFER_SIZE, "File %s successfully deleted.\n", filename); //remove file
   }
   else
   {
-    snprintf(message, BUFFER_SIZE, "Error deleting file %s.\n", filename);
+    snprintf(message, BUFFER_SIZE, "Error deleting file %s.\n", filename); //error removing
   }
 }
 
-//displays a file
+//displays file
 void display_file(const char *filename)
 {
-  FILE *file = fopen(filename, "r");
+  FILE *file = fopen(filename, "r"); //open file
   if (file == NULL)
   {
-    printf("Unable to open file %s\n", filename);
+    printf("Unable to open file %s\n", filename); //error reading file
     return;
   }
 
@@ -285,7 +290,7 @@ void display_file(const char *filename)
   char ch;
   while ((ch = fgetc(file)) != EOF)
   {
-    putchar(ch);
+    putchar(ch); //putchar instead of printf to print with standard output
   }
   printf("\n\n");
   //close the file
@@ -295,15 +300,15 @@ void display_file(const char *filename)
 //change working directory
 void change_directory(char *path)
 {
-  if (chdir(path) != 0)
+  if (chdir(path) != 0) //change cwd to speficied directory
   {
-    perror("chdir");
+    perror("chdir"); //print error message 
   }
 }
 
 int main(int argc, char **argv) 
 {
-    //if called with arguments, set the starting directory to the argument.
+    //if called with arguments, set the starting directory to argument
     if(argc == 2)
         change_directory(argv[1]);
 
@@ -318,7 +323,7 @@ int main(int argc, char **argv)
     //clear terminal
     printf("\033[H\033[J");
 
-    //print current working directory
+    //print cwd
     if (getcwd(cmd, sizeof(cmd)) == NULL)
     {
       perror("getcwd");
@@ -333,7 +338,7 @@ int main(int argc, char **argv)
     //display the contents of the cwd with pagination
     display_contents();
 
-        //print message from the previous command, then clears the message.
+        //print message from the previous command, then clear the message
         if(strlen(message) > 0){
             printf("%s\n\n", message);
             strcpy(message, "");
@@ -351,7 +356,7 @@ int main(int argc, char **argv)
         printf("Exiting. Thank you for using this program.\n\n\nDeveloped by Kevin Farokhrouz and Ali Jifi-Bahlool\n\n");
         exit(0);
       case 'n': //next page
-        //make sure not to go past the length of the file count.
+        //make sure not to go past the length of the file count
         if (current_start + 5 < file_count)
         {
           current_start += 5;
@@ -418,9 +423,9 @@ int main(int argc, char **argv)
         fgets(cmd, BUFFER_SIZE, stdin);
         cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
         change_directory(cmd);
-        //create a list of the new cwd's contents
+        //create a list of new cwd's contents
         get_directory_contents();
-        //reset the start of the pagination since the list is new
+        //reset the start of the pagination since list is new
         current_start = 0;
         break;
       case 'd': //display file
@@ -431,7 +436,7 @@ int main(int argc, char **argv)
         display_file(cmd);
         printf("Press Enter to continue. ");
         ch = getchar();
-        if(ch != '\n') //Ensures enter doesn't have to be pressed twice
+        if(ch != '\n') //ensures enter doesn't need to be pressed twice
           while (getchar() != '\n'); //clears stdin
         break;
       case 'v': //remove file
@@ -439,9 +444,9 @@ int main(int argc, char **argv)
         fgets(cmd, BUFFER_SIZE, stdin);
         cmd[strcspn(cmd, "\n")] = '\0';
         remove_file(cmd);
-        //create a list of the directory contents since the user removed a file
+        //create a list of the directory contents, user removed a file
         get_directory_contents();
-        //reset the start of the pagination since we created a new list
+        //reset the start of the pagination because of created new list
         current_start = 0;
         break;
       default:
