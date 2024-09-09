@@ -2,6 +2,7 @@
 //Ali Jifi-Bahlool
 //CSE 3320-001
 //Lab 1
+//works
 
 #include <sys/types.h>
 #include <stdlib.h>
