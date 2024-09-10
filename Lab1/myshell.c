@@ -2,7 +2,11 @@
 //Ali Jifi-Bahlool
 //CSE 3320-001
 //Lab 1
-//works
+
+//Sources:
+//https://brennan.io/2015/01/16/write-a-shell-in-c/
+//https://dev.to/wahomethegeek/building-your-own-shell-in-c-a-journey-into-command-line-magic-2lon
+//https://stackoverflow.com/questions/4788374/writing-a-basic-shell
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -39,7 +43,7 @@ int file_count = 0; //number of files stored in file_list array
 int current_start = 0; //controls which set of files is displayed
 
 // retrieves and displays current time
-void display_time()
+void displayTime()
 {
   time_t t = time(NULL);
   if (t == -1)
@@ -48,26 +52,26 @@ void display_time()
     return;
   }
 //use of perror instead of printf to print error message, directly uses errno to print more accurate error messages
-  struct tm *tm_info = localtime(&t); 
+  struct tm *tm_info = localTime(&t); 
   if (tm_info == NULL)
   {
-    perror("localtime, could not convert to local time");
+    perror("localTime, could not convert to local time");
     return;
   }
   //error creating time struct, ex: month, day, year
 
   //clean up time display format
-  char buffer[BUFFER_SIZE];
-  if (strftime(buffer, sizeof(buffer), "%d %B %Y, %I:%M %p", tm_info) == 0)
+  char timeBuffer[BUFFER_SIZE];
+  if (strftime(timeBuffer, sizeof(timeBuffer), "%d %B %Y, %I:%M %p", tm_info) == 0) //
   {
     fprintf(stderr, "Error formatting time\n");
     return;
   }
-  printf("It is currently %s\n", buffer);
+  printf("It is currently %s\n", timeBuffer);
 }
 
 //list directory contents
-void get_directory_contents()
+void getDirectoryContents()
 {
   DIR *d = opendir("."); //opens cwd, returns pointer to directory stream, a data structure used to represent a directory 
   if (d == NULL)
@@ -101,22 +105,22 @@ void get_directory_contents()
 //+ if first file is greater/larger/later
 //= if files are equal in size, date, or name
 //- if first file is lesser/smaller/earlier
-int compare_by_name(const void *a, const void *b) //sort by name, compare two FileEntry structs by name fields
+int sortName(const void *a, const void *b) //sort by name, compare two FileEntry structs by name fields
 {
   return strcmp(((FileEntry *)a)->name, ((FileEntry *)b)->name);
 }
 
-int compare_by_size(const void *a, const void *b) //sort by size, compare two FileEntry structs by size fields
+int sortSize(const void *a, const void *b) //sort by size, compare two FileEntry structs by size fields
 {
   return ((FileEntry *)a)->size - ((FileEntry *)b)->size;
 }
 
-int compare_by_date(const void *a, const void *b) //sort by date, compare two FileEntry structs by date fields
+int sortDate(const void *a, const void *b) //sort by date, compare two FileEntry structs by date fields
 {
   return ((FileEntry *)a)->mtime - ((FileEntry *)b)->mtime;
 }
 
-void sort_files(int sort_option) //chooses comparsion function based on user input, "sort_option"
+void sortFiles(int sort_option) //chooses comparsion function based on user input, "sort_option"
 {
   switch (sort_option)
   {
@@ -136,13 +140,13 @@ void sort_files(int sort_option) //chooses comparsion function based on user inp
 }
 
 //display files with pagination
-void display_contents()
+void displayContents()
 {
   printf("Current Directory Contents:\n\n");
   // //iterate through the file_list array and display file details, loop thru first 5 entries, increment or decrement current_start to display next or past 5 entries 
   for (int i = current_start; i < current_start + 5 && i < file_count; i++)
   {
-    char *type = (S_ISDIR(file_list[i].mode)) ? "Directory" : "File"; //checks if directory or file, marco
+    char *type = (S_ISDIR(file_list[i].mode)) ? "Directory" : "File"; //checks if directory or file, macro
     printf("%d. [%s] %s \tSize: %ld bytes, Date: %s", i, type, file_list[i].name, file_list[i].size, ctime(&file_list[i].mtime)); //displays index number, type, name, size, and date
   }
   printf("\n\nOperation:          \n\t\t"
@@ -159,7 +163,7 @@ void display_contents()
 }
 
 //edit a file using the users preferred editor
-void edit_file(char *filename)
+void editFile(char *filename)
 {
   char *editor = getenv("EDITOR");
   if (editor == NULL)
@@ -190,13 +194,13 @@ void edit_file(char *filename)
 }
 
 //used during run_file, to capture ctrl c interrupt properly instead of printing generic failure
-void signal_handler(int sig)
+void signalHandler(int sig)
 {
   //empty signal handler to ignore SIGINT
 }
 
 //run an executable
-void run_file(char *filename)
+void runFile(char *filename)
 {
   char *args[] = {filename, NULL};
 
@@ -227,7 +231,7 @@ void run_file(char *filename)
   }
   else
   {
-    signal(SIGINT, signal_handler); //ignore SIGINT in parent function
+    signal(SIGINT, signalHandler); //ignore SIGINT in parent function
 
     int status;
     if (waitpid(pid, &status, 0) == -1) //wait for fork (child)
@@ -263,7 +267,7 @@ void run_file(char *filename)
 }
 
 //removes file
-void remove_file(const char *filename)
+void removeFile(const char *filename)
 {
 
   FILE *file = fopen(filename, "w"); //open file
@@ -278,7 +282,7 @@ void remove_file(const char *filename)
 }
 
 //displays file
-void display_file(const char *filename)
+void displayFile(const char *filename)
 {
   FILE *file = fopen(filename, "r"); //open file
   if (file == NULL)
@@ -299,7 +303,7 @@ void display_file(const char *filename)
 }
 
 //change working directory
-void change_directory(char *path)
+void changeDirectory(char *path)
 {
   if (chdir(path) != 0) //change cwd to speficied directory
   {
@@ -311,13 +315,13 @@ int main(int argc, char **argv)
 {
     //if called with arguments, set the starting directory to argument
     if(argc == 2)
-        change_directory(argv[1]);
+        changeDirectory(argv[1]);
 
     char cmd[BUFFER_SIZE];
     int ch;
 
   //create a list of the current directory's contents
-  get_directory_contents();
+  getDirectoryContents();
 
   while (1)
   {
@@ -333,11 +337,11 @@ int main(int argc, char **argv)
     printf("Current Directory: %s\n", cmd);
 
     //display current time
-    display_time();
+    displayTime();
     printf("---\n");
 
     //display the contents of the cwd with pagination
-    display_contents();
+    displayContents();
 
         //print message from the previous command, then clear the message
         if(strlen(message) > 0){
@@ -387,7 +391,7 @@ int main(int argc, char **argv)
           while (getchar() != '\n'); //clear input buffer
           if (sort_option >= 1 && sort_option <= 3)
           {
-            sort_files(sort_option); //sort file list based on chosen option
+            sortFiles(sort_option); //sort file list based on chosen option
             current_start = 0;       //reset the start of page list
             break;
           }
@@ -401,9 +405,9 @@ int main(int argc, char **argv)
         printf("Which file would you like to edit? ");
         fgets(cmd, BUFFER_SIZE, stdin);
         cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
-        edit_file(cmd);
+        editFile(cmd);
         //create a list of the directory contents- important if the user just created a new file.
-        get_directory_contents();
+        getDirectoryContents();
         //reset the start of the pagination since we created a new list
         current_start = 0;
         break;
@@ -411,9 +415,9 @@ int main(int argc, char **argv)
         printf("Which file would you like to run? ");
         fgets(cmd, BUFFER_SIZE, stdin);
         cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
-        run_file(cmd);
+        runFile(cmd);
         //create a list of the directory contents- important if the user just created a new file.
-        get_directory_contents();
+        getDirectoryContents();
         //reset the start of the pagination since we created a new list
         current_start = 0;
         printf("MESSAGE after run: %s", message);
@@ -423,9 +427,9 @@ int main(int argc, char **argv)
         printf("Which directory would you like to move to? ");
         fgets(cmd, BUFFER_SIZE, stdin);
         cmd[strcspn(cmd, "\n")] = '\0'; //remove newline character
-        change_directory(cmd);
+        changeDirectory(cmd);
         //create a list of new cwd's contents
-        get_directory_contents();
+        getDirectoryContents();
         //reset the start of the pagination since list is new
         current_start = 0;
         break;
@@ -434,7 +438,7 @@ int main(int argc, char **argv)
         fgets(cmd, BUFFER_SIZE, stdin);
         cmd[strcspn(cmd, "\n")] = '\0';
         printf("File contents:\n\n");
-        display_file(cmd);
+        displayFile(cmd);
         printf("Press Enter to continue. ");
         ch = getchar();
         if(ch != '\n') //ensures enter doesn't need to be pressed twice
@@ -444,9 +448,9 @@ int main(int argc, char **argv)
         printf("Which file would you like to remove? ");
         fgets(cmd, BUFFER_SIZE, stdin);
         cmd[strcspn(cmd, "\n")] = '\0';
-        remove_file(cmd);
+        removeFile(cmd);
         //create a list of the directory contents, user removed a file
-        get_directory_contents();
+        getDirectoryContents();
         //reset the start of the pagination because of created new list
         current_start = 0;
         break;
