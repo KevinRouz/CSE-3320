@@ -2,6 +2,9 @@
 //Ali Jifi-Bahlool
 //CSE 3320-001
 //Lab 1
+//Implemented by Kevin: message, display_file(), change_directory(), remove_file(), call with argument
+//Implemented by Ali: FileEnry Struct, display_time(), get_directory_contents(), sort_files(), process forking
+//Implemented by both: display_contents(), edit_file(), main(), main switch logic, run_file()
 
 //Sources:
 //https://brennan.io/2015/01/16/write-a-shell-in-c/
