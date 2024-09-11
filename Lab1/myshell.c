@@ -24,7 +24,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define MAX_FILES 1024 //max number of files in file_list array
+#define MAX_FILES 1024 //max number of files in fileList array
 #define BUFFER_SIZE 512 //max buffer size to temp store data
 
 //declare global variable message, that can be used to display a message next time the screen is refreshed
@@ -36,14 +36,14 @@ typedef struct
 {
   char name[BUFFER_SIZE];
   off_t size;
-  time_t mtime; //last modified time of file
+  time_t modTime; //last modified time of file
   mode_t mode;  //file type and permissions
 } FileEntry;
 
 //array of FileEntry structs that hold info about files and directories in the cwd
-FileEntry file_list[MAX_FILES];
-int file_count = 0; //number of files stored in file_list array
-int current_start = 0; //controls which set of files is displayed
+FileEntry fileList[MAX_FILES];
+int fileCount = 0; //number of files stored in fileList array
+int currentStart = 0; //controls which set of files is displayed
 
 // retrieves and displays current time
 void displayTime()
@@ -55,17 +55,17 @@ void displayTime()
     return;
   }
 //use of perror instead of printf to print error message, directly uses errno to print more accurate error messages
-  struct tm *tm_info = localTime(&t); 
-  if (tm_info == NULL)
+  struct tm *timeInfo = localtime(&t); 
+  if (timeInfo == NULL)
   {
-    perror("localTime, could not convert to local time");
+    perror("localtime, could not convert to local time");
     return;
   }
   //error creating time struct, ex: month, day, year
 
   //clean up time display format
   char timeBuffer[BUFFER_SIZE];
-  if (strftime(timeBuffer, sizeof(timeBuffer), "%d %B %Y, %I:%M %p", tm_info) == 0) //
+  if (strftime(timeBuffer, sizeof(timeBuffer), "%d %B %Y, %I:%M %p", timeInfo) == 0) //
   {
     fprintf(stderr, "Error formatting time\n");
     return;
@@ -83,22 +83,22 @@ void getDirectoryContents()
     return;
   }
 
-  struct dirent *de; //pointer to hold directory entries already read by readdir
-  file_count = 0; //number of files read, resets to zero every function call
+  struct dirent *directoryEntry; //pointer to hold directory entries already read by readdir
+  fileCount = 0; //number of files read, resets to zero every function call
 
-  //set file info for each entry to a pointer containing the file info, continues until file_list reaches max size
-  while ((de = readdir(d)) && file_count < MAX_FILES)
+  //set file info for each entry to a pointer containing the file info, continues until fileList reaches max size
+  while ((directoryEntry = readdir(d)) && fileCount < MAX_FILES)
   {
     struct stat st; //struct variable to hold detailed info about each file
-    if (stat(de->d_name, &st) == 0) //fill st struct with file info, if not 0 (error) skip
+    if (stat(directoryEntry->d_name, &st) == 0) //fill st struct with file info, if not 0 (error) skip
     {
-      if (strcmp(de->d_name, ".") == 0) //skip cwd entry 
+      if (strcmp(directoryEntry->d_name, ".") == 0) //skip cwd entry 
         continue;
-      strncpy(file_list[file_count].name, de->d_name, BUFFER_SIZE); //copy cwd entry into name field, only use buffer_size to avoid buffer overflow
-      file_list[file_count].size = st.st_size; //copy file size field
-      file_list[file_count].mtime = st.st_mtime; //copy file modification time 
-      file_list[file_count].mode = st.st_mode; //copy file mode field (file type, permissions)
-      file_count++; //increment file count to move to next entry
+      strncpy(fileList[fileCount].name, directoryEntry->d_name, BUFFER_SIZE); //copy cwd entry into name field, only use buffer_size to avoid buffer overflow
+      fileList[fileCount].size = st.st_size; //copy file size field
+      fileList[fileCount].modTime = st.st_mtime; //copy file modification time 
+      fileList[fileCount].mode = st.st_mode; //copy file mode field (file type, permissions)
+      fileCount++; //increment file count to move to next entry
     }
   }
   closedir(d); //close directory stream 
@@ -120,7 +120,7 @@ int sortSize(const void *a, const void *b) //sort by size, compare two FileEntry
 
 int sortDate(const void *a, const void *b) //sort by date, compare two FileEntry structs by date fields
 {
-  return ((FileEntry *)a)->mtime - ((FileEntry *)b)->mtime;
+  return ((FileEntry *)a)->modTime - ((FileEntry *)b)->modTime;
 }
 
 void sortFiles(int sort_option) //chooses comparsion function based on user input, "sort_option"
@@ -128,13 +128,13 @@ void sortFiles(int sort_option) //chooses comparsion function based on user inpu
   switch (sort_option)
   {
     case 1:
-      qsort(file_list, file_count, sizeof(FileEntry), compare_by_name); //compare alphabetically
+      qsort(fileList, fileCount, sizeof(FileEntry), sortName); //sort alphabetically
       break;
     case 2:
-      qsort(file_list, file_count, sizeof(FileEntry), compare_by_size); //compare size
+      qsort(fileList, fileCount, sizeof(FileEntry), sortSize); //sort size
       break;
     case 3:
-      qsort(file_list, file_count, sizeof(FileEntry), compare_by_date); //compare modification time
+      qsort(fileList, fileCount, sizeof(FileEntry), sortDate); //sort modification time
       break;
     default:
       printf("Invalid sorting option!\n"); 
@@ -146,11 +146,11 @@ void sortFiles(int sort_option) //chooses comparsion function based on user inpu
 void displayContents()
 {
   printf("Current Directory Contents:\n\n");
-  // //iterate through the file_list array and display file details, loop thru first 5 entries, increment or decrement current_start to display next or past 5 entries 
-  for (int i = current_start; i < current_start + 5 && i < file_count; i++)
+  // //iterate through the fileList array and display file details, loop thru first 5 entries, increment or decrement currentStart to display next or past 5 entries 
+  for (int i = currentStart; i < currentStart + 5 && i < fileCount; i++)
   {
-    char *type = (S_ISDIR(file_list[i].mode)) ? "Directory" : "File"; //checks if directory or file, macro
-    printf("%d. [%s] %s \tSize: %ld bytes, Date: %s", i, type, file_list[i].name, file_list[i].size, ctime(&file_list[i].mtime)); //displays index number, type, name, size, and date
+    char *type = (S_ISDIR(fileList[i].mode)) ? "Directory" : "File"; //checks if directory or file, macro
+    printf("%d. [%s] %s \tSize: %ld bytes, Date: %s", i, type, fileList[i].name, fileList[i].size, ctime(&fileList[i].modTime)); //displays index number, type, name, size, and date
   }
   printf("\n\nOperation:          \n\t\t"
          "N  Next page               \n\t\t"
@@ -365,9 +365,9 @@ int main(int argc, char **argv)
         exit(0);
       case 'n': //next page
         //make sure not to go past the length of the file count
-        if (current_start + 5 < file_count)
+        if (currentStart + 5 < fileCount)
         {
-          current_start += 5;
+          currentStart += 5;
         }
         else
         { //otherwise prevent user from going below zero, already at the last page
@@ -376,9 +376,9 @@ int main(int argc, char **argv)
       break;
       case 'b': //previous page
         //make sure not to go below zero
-        if (current_start - 5 >= 0)
+        if (currentStart - 5 >= 0)
         {
-          current_start -= 5;
+          currentStart -= 5;
         }
         else
         { //otherwise prevent user from going past the last page
@@ -395,7 +395,7 @@ int main(int argc, char **argv)
           if (sort_option >= 1 && sort_option <= 3)
           {
             sortFiles(sort_option); //sort file list based on chosen option
-            current_start = 0;       //reset the start of page list
+            currentStart = 0;       //reset the start of page list
             break;
           }
           else
@@ -412,7 +412,7 @@ int main(int argc, char **argv)
         //create a list of the directory contents- important if the user just created a new file.
         getDirectoryContents();
         //reset the start of the pagination since we created a new list
-        current_start = 0;
+        currentStart = 0;
         break;
       case 'r': //run
         printf("Which file would you like to run? ");
@@ -422,7 +422,7 @@ int main(int argc, char **argv)
         //create a list of the directory contents- important if the user just created a new file.
         getDirectoryContents();
         //reset the start of the pagination since we created a new list
-        current_start = 0;
+        currentStart = 0;
         printf("MESSAGE after run: %s", message);
         break;
       case 'm': //move to directory
@@ -434,7 +434,7 @@ int main(int argc, char **argv)
         //create a list of new cwd's contents
         getDirectoryContents();
         //reset the start of the pagination since list is new
-        current_start = 0;
+        currentStart = 0;
         break;
       case 'd': //display file
         printf("Which file would you like to display? ");
@@ -455,7 +455,7 @@ int main(int argc, char **argv)
         //create a list of the directory contents, user removed a file
         getDirectoryContents();
         //reset the start of the pagination because of created new list
-        current_start = 0;
+        currentStart = 0;
         break;
       default:
         strcpy(message, "Invalid command!");
