@@ -1,3 +1,6 @@
+// Kevin Farokhrouz
+// 1002072886
+// CSE 3320-001 Lab 2
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -81,35 +84,6 @@ void merge(Tuple *arr, int low, int mid, int high) {
     }
 
     free(temp);
-}
-
-// Forking and executing sorting
-void parallelSort(Tuple *data, int start, int end, int pipe_fd[], int process_id) {
-    close(pipe_fd[0]); // Close reading end
-
-    // Sort the portion of the data
-    int n = end - start + 1;
-    bubbleSort(data + start, n);
-
-    // Print sorted part for this child process
-    printf("Process %d sorted data:\n", process_id);
-    printSortedData(data + start, n, "Child Process");
-
-    // Send sorted data to parent
-    write(pipe_fd[1], &data[start], n * sizeof(Tuple));
-    close(pipe_fd[1]); // Close writing end
-    exit(0); // Child exits after sorting
-}
-
-// Merging function that handles the whole array progressively
-void parallelMerge(Tuple *data, int n, int num_segments, int segment_size) {
-    for (int step = 1; step < num_segments; step *= 2) {
-        for (int i = 0; i + step < num_segments; i += 2 * step) {
-            int mid = (i + step) * segment_size - 1;
-            int end = ((i + 2 * step) * segment_size - 1 < n) ? ((i + 2 * step) * segment_size - 1) : n - 1;
-            merge(data, i * segment_size, mid, end);
-        }
-    }
 }
 
 int main() {

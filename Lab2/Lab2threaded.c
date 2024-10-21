@@ -1,3 +1,6 @@
+// Kevin Farokhrouz
+// 1002072886
+// CSE 3320-001 Lab 2
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
